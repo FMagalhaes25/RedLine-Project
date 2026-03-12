@@ -26,6 +26,8 @@ import { supabase } from './lib/supabase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { CalendarView } from './components/CalendarView';
+import { HabitTracker } from './components/HabitTracker';
+import { BrainDump } from './components/BrainDump';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -37,16 +39,26 @@ interface Task {
   title: string;
   is_completed: boolean;
   is_priority: boolean;
+  is_the_one_thing?: boolean;
+  category?: string;
   created_at: string;
+  scheduled_at?: string;
 }
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'calendar'>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [newCategory, setNewCategory] = useState('General');
   const [showOnlyPriority, setShowOnlyPriority] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Operator Stats (XP & Leveling)
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [missionsCompleted, setMissionsCompleted] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showReview, setShowReview] = useState(false);
+  const [lastSessionRating, setLastSessionRating] = useState(0);
 
   // Focus Engine State
   const [timer, setTimer] = useState(30 * 60);
@@ -58,7 +70,7 @@ export default function App() {
   // Initialize Supabase Connection & Fetch
   useEffect(() => {
     if (!supabase) {
-      setError("SUPABASE_CONFIG_MISSING: Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      setError("CONFIG_SUPABASE_AUSENTE: Por favor, configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
       setLoading(false);
       return;
     }
@@ -83,15 +95,18 @@ export default function App() {
     }
   };
 
-  const addTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTask.trim()) return;
+  const addTask = async (e?: React.FormEvent, titleOverride?: string, dateOverride?: Date) => {
+    if (e) e.preventDefault();
+    const titleToUse = titleOverride || newTask;
+    if (!titleToUse.trim()) return;
 
     const taskData = {
-      title: newTask,
+      title: titleToUse,
       is_completed: false,
       is_priority: tasks.filter(t => !t.is_completed && t.is_priority).length < 3,
+      category: dateOverride ? 'Agendado' : newCategory,
       created_at: new Date().toISOString(),
+      scheduled_at: dateOverride ? dateOverride.toISOString() : new Date().toISOString(),
     };
 
     try {
@@ -105,7 +120,7 @@ export default function App() {
         setTasks(updated);
         localStorage.setItem('redline_tasks', JSON.stringify(updated));
       }
-      setNewTask('');
+      if (!titleOverride) setNewTask('');
     } catch (err) {
       console.error('Add error:', err);
     }
@@ -153,6 +168,35 @@ export default function App() {
     }
   };
 
+  const toggleTheOneThing = async (id: string, currentStatus: boolean) => {
+    try {
+      if (supabase) {
+        // Reset all others first (simplified local update)
+        await supabase.from('tasks').update({ is_the_one_thing: false }).neq('id', id);
+        await supabase.from('tasks').update({ is_the_one_thing: !currentStatus }).eq('id', id);
+      }
+      const updated = tasks.map(t => ({
+        ...t,
+        is_the_one_thing: t.id === id ? !currentStatus : false
+      }));
+      setTasks(updated);
+    } catch (err) {
+      console.error('The One Thing error:', err);
+    }
+  };
+
+  const handleReview = async (rating: number) => {
+    try {
+      if (supabase) {
+        await supabase.from('focus_reviews').insert([{ rating, session_duration: 30 }]);
+      }
+      setLastSessionRating(rating);
+      setShowReview(false);
+    } catch (err) {
+      console.error('Review error:', err);
+    }
+  };
+
   // Timer Logic
   useEffect(() => {
     if (isActive && timer > 0) {
@@ -161,7 +205,18 @@ export default function App() {
       }, 1000);
     } else if (timer === 0) {
       setIsActive(false);
-      alert(mode === 'focus' ? "Focus session complete!" : "Break over!");
+      // Award XP on completion
+      if (mode === 'focus') {
+        const xpGained = 50;
+        setXp(prev => prev + xpGained);
+        if ((xp + xpGained) >= level * 500) {
+          setLevel(prev => prev + 1);
+          setXp(0);
+        }
+        setShowReview(true);
+      } else {
+        alert("Intervalo encerrado!");
+      }
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isActive, timer, mode]);
@@ -172,12 +227,48 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isToday = (dateString: string) => {
+    const d = new Date(dateString);
+    const today = new Date();
+    return d.getDate() === today.getDate() &&
+           d.getMonth() === today.getMonth() &&
+           d.getFullYear() === today.getFullYear();
+  };
+
+  const dashboardTasks = tasks.filter(t => {
+    if (t.scheduled_at) return isToday(t.scheduled_at);
+    return isToday(t.created_at);
+  });
+
   const filteredTasks = showOnlyPriority 
-    ? tasks.filter(t => t.is_priority && !t.is_completed)
-    : tasks;
+    ? dashboardTasks.filter(t => t.is_priority && !t.is_completed)
+    : dashboardTasks;
 
   return (
-    <div className="min-h-screen flex flex-col items-center">
+    <div className={cn(
+      "min-h-screen flex flex-col items-center transition-colors duration-1000",
+      isActive && mode === 'focus' ? "bg-[#0A0203]" : "bg-[#050505]"
+    )}>
+      {/* Tactical Background Pulse */}
+      <AnimatePresence>
+        {isActive && mode === 'focus' && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle at 50% 50%, rgba(255, 45, 85, 0.03) 0%, transparent 70%)',
+            }}
+          >
+            <motion.div 
+              className="absolute inset-0 bg-cyber-red/5"
+              animate={{ opacity: [0.1, 0.3, 0.1] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Navigation Rail (Modern Touch) */}
       <nav className="fixed left-0 top-0 h-full w-20 bg-black/40 backdrop-blur-md border-r border-white/5 hidden lg:flex flex-col items-center py-8 gap-8 z-50">
         <div className="w-12 h-12 rounded-2xl bg-cyber-red flex items-center justify-center shadow-lg shadow-cyber-red/30 mb-4">
@@ -205,8 +296,8 @@ export default function App() {
             <h1 className="text-3xl font-display font-bold tracking-tight text-white">
               RED<span className="text-cyber-red text-glow">LINE</span>
             </h1>
-            <p className="text-xs text-white/40 font-medium uppercase tracking-widest mt-1">
-              {view === 'dashboard' ? 'Modern Productivity OS' : 'Mission Archive & Schedule'}
+            <p className="text-[10px] text-cyber-red font-bold uppercase tracking-widest mt-1">
+              {view === 'dashboard' ? 'SO de Produtividade Moderna' : 'Arquivo de Missões & Agenda'}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -216,11 +307,20 @@ export default function App() {
               <button onClick={() => setView('calendar')} className={cn("p-2 rounded-lg", view === 'calendar' ? "bg-cyber-red/20 text-cyber-red" : "text-white/40")}><Calendar size={20} /></button>
             </div>
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs font-semibold text-white/60">OPERATOR_01</span>
-              <span className="text-[10px] text-cyber-red font-bold uppercase">System Active</span>
+              <span className="text-xs font-semibold text-white/60 text-right">OPERADOR_01 <span className="text-cyber-red ml-2">[NÍVEL {level}]</span></span>
+              <div className="w-32 h-1 bg-white/5 rounded-full mt-1 overflow-hidden border border-white/5">
+                <motion.div 
+                  className="h-full bg-cyber-red" 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(xp / (level * 500)) * 100}%` }}
+                />
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-full border-2 border-cyber-red/30 p-0.5">
+            <div className="w-12 h-12 rounded-full border-2 border-cyber-red/30 p-0.5 relative group cursor-pointer">
               <img src="https://picsum.photos/seed/operator/100/100" className="rounded-full grayscale" alt="User" referrerPolicy="no-referrer" />
+              <div className="absolute -bottom-1 -right-1 bg-cyber-red text-[8px] font-black px-1.5 py-0.5 rounded-full border border-black text-white">
+                QG
+              </div>
             </div>
           </div>
         </header>
@@ -248,29 +348,79 @@ export default function App() {
               {/* Left: Tasks */}
               <div className="lg:col-span-7 space-y-8">
                 {/* Input Section */}
-                <form onSubmit={addTask} className="relative group">
-                  <input 
-                    type="text"
-                    value={newTask}
-                    onChange={(e) => setNewTask(e.target.value)}
-                    placeholder="What's the next mission?"
-                    className="w-full glass-input py-4 px-6 text-white placeholder:text-white/20 outline-none"
-                  />
+                <form onSubmit={addTask} className="relative group flex items-center">
+                  <div className="flex bg-black/20 rounded-xl overflow-hidden self-stretch sm:self-auto">
+                    <select 
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="bg-transparent text-[10px] font-bold uppercase py-4 px-4 text-white/40 outline-none border-r border-white/5 cursor-pointer hover:text-cyber-red transition-colors"
+                    >
+                      <option className="bg-[#050505]">Geral</option>
+                      <option className="bg-[#050505]">Construção</option>
+                      <option className="bg-[#050505]">Aprendizado</option>
+                      <option className="bg-[#050505]">Saúde</option>
+                      <option className="bg-[#050505]">Admin</option>
+                    </select>
+                    <input 
+                      type="text"
+                      value={newTask}
+                      onChange={(e) => setNewTask(e.target.value)}
+                      placeholder="Qual a próxima missão para hoje?"
+                      className="flex-1 glass-input border-none py-4 px-6 text-white placeholder:text-white/20 outline-none"
+                    />
+                  </div>
                   <button 
                     type="submit"
-                    className="absolute right-2 top-2 bottom-2 px-6 btn-primary flex items-center gap-2"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-6 btn-primary flex items-center gap-2"
                   >
                     <Plus size={18} />
-                    <span className="hidden sm:inline">Add</span>
+                    <span className="hidden sm:inline">Adicionar</span>
                   </button>
                 </form>
 
-                {/* Task List */}
-                <div className="space-y-6">
+                {/* The One Thing (A Única Coisa) Section */}
+                {dashboardTasks.find(t => t.is_the_one_thing && !t.is_completed) && (
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-cyber-red flex items-center gap-2">
+                       <Zap size={14} fill="currentColor" />
+                       A Única Coisa
+                    </h3>
+                    {dashboardTasks.filter(t => t.is_the_one_thing && !t.is_completed).map(task => (
+                      <motion.div
+                        key={task.id}
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="glass-card p-6 border-cyber-red bg-cyber-red/[0.05] shadow-[0_0_20px_rgba(255,45,85,0.1)] relative overflow-hidden"
+                      >
+                        <div className="absolute top-0 right-0 p-2 opacity-20">
+                           <Target size={40} />
+                        </div>
+                        <div className="flex items-center gap-4 relative z-10">
+                          <button 
+                            onClick={() => toggleComplete(task.id, task.is_completed)}
+                            className="w-10 h-10 rounded-xl border-2 border-cyber-red bg-cyber-red text-white flex items-center justify-center animate-pulse"
+                          >
+                            <Check size={24} strokeWidth={4} />
+                          </button>
+                          <div>
+                            <span className="text-lg font-bold text-white block mb-1">{task.title}</span>
+                            <span className="text-[10px] text-white/50 uppercase font-black">MISSÃO PRIORITÁRIA ALPHA</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Task List - Blurred during Dopamine Lock */}
+                <div className={cn(
+                  "space-y-6 transition-all duration-700",
+                  isActive && mode === 'focus' && "blur-md opacity-20 pointer-events-none grayscale"
+                )}>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Target size={18} className="text-cyber-red" />
-                      <h2 className="font-display font-semibold text-lg">Mission Log</h2>
+                      <h2 className="font-display font-semibold text-lg">Registro de Missões</h2>
                     </div>
                     <button 
                       onClick={() => setShowOnlyPriority(!showOnlyPriority)}
@@ -281,16 +431,16 @@ export default function App() {
                           : "bg-white/5 text-white/40 hover:bg-white/10"
                       )}
                     >
-                      {showOnlyPriority ? "All Tasks" : "Top 3 Focus"}
+                      {showOnlyPriority ? "Todas as Tarefas" : "Foco Top 3"}
                     </button>
                   </div>
 
                   <div className="space-y-3">
                     <AnimatePresence mode="popLayout">
                       {loading ? (
-                        <div className="py-12 text-center text-white/20 animate-pulse">Synchronizing...</div>
+                        <div className="py-12 text-center text-white/20 animate-pulse">Sincronizando...</div>
                       ) : filteredTasks.length === 0 ? (
-                        <div className="py-12 text-center text-white/10 italic">No objectives found.</div>
+                        <div className="py-12 text-center text-white/10 italic">Nenhuma missão encontrada.</div>
                       ) : (
                         filteredTasks.map((task) => (
                           <motion.div
@@ -323,9 +473,24 @@ export default function App() {
                               )}>
                                 {task.title}
                               </span>
+                              {task.category && (
+                                <span className="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-white/5 text-white/30 border border-white/5">
+                                  {task.category}
+                                </span>
+                              )}
                             </div>
                             
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => toggleTheOneThing(task.id, !!task.is_the_one_thing)}
+                                className={cn(
+                                  "p-2 rounded-lg transition-colors",
+                                  task.is_the_one_thing ? "text-cyber-red bg-cyber-red/10" : "text-white/20 hover:text-cyber-red hover:bg-cyber-red/5"
+                                )}
+                                title="Marcar como A Única Coisa"
+                              >
+                                <Target size={16} fill={task.is_the_one_thing ? "currentColor" : "none"} />
+                              </button>
                               <button 
                                 onClick={() => togglePriority(task.id, task.is_priority)}
                                 className={cn(
@@ -350,15 +515,15 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Right: Timer & Stats */}
-              <div className="lg:col-span-5 space-y-8">
+              {/* Focus Center - Main Column */}
+              <div className="lg:col-span-5 space-y-8 z-20">
                 <div className="glass-card p-8 flex flex-col items-center relative overflow-hidden">
                   {/* Background Glow */}
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyber-red/20 blur-[80px] rounded-full"></div>
                   
                   <div className="flex items-center gap-2 mb-8 bg-white/5 px-4 py-1.5 rounded-full border border-white/10">
                     <Clock size={14} className="text-cyber-red" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Focus Engine</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Motor de Foco</span>
                   </div>
 
                   <div className={cn(
@@ -376,7 +541,7 @@ export default function App() {
                         isActive && "from-white/10 to-white/5 text-white shadow-none border border-white/10"
                       )}
                     >
-                      {isActive ? <><Pause size={20} /> Pause</> : <><Play size={20} /> Start Session</>}
+                      {isActive ? <><Pause size={20} /> Pausar</> : <><Play size={20} /> Iniciar Sessão</>}
                     </button>
                     <button 
                       onClick={() => { setIsActive(false); setTimer(mode === 'focus' ? 30 * 60 : 5 * 60); }}
@@ -394,7 +559,7 @@ export default function App() {
                         mode === 'focus' ? "bg-white/10 text-white shadow-sm" : "text-white/30 hover:text-white/60"
                       )}
                     >
-                      Focus
+                      Foco
                     </button>
                     <button 
                       onClick={() => { setMode('break'); setTimer(5 * 60); setIsActive(false); }}
@@ -403,35 +568,71 @@ export default function App() {
                         mode === 'break' ? "bg-white/10 text-white shadow-sm" : "text-white/30 hover:text-white/60"
                       )}
                     >
-                      Break
+                      Intervalo
                     </button>
                   </div>
                 </div>
 
-                {/* Stats / Briefing */}
-                <div className="glass-card p-6 space-y-6">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
-                    <ChevronRight size={14} className="text-cyber-red" />
-                    Performance Metrics
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-bold text-white/30 uppercase mb-1">Active</p>
-                      <p className="text-2xl font-display font-bold text-white">{tasks.filter(t => !t.is_completed).length}</p>
-                    </div>
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-bold text-white/30 uppercase mb-1">Completed</p>
-                      <p className="text-2xl font-display font-bold text-cyber-red">{tasks.filter(t => t.is_completed).length}</p>
-                    </div>
-                  </div>
-                  <div className="p-4 bg-cyber-red/5 rounded-2xl border border-cyber-red/10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-cyber-red/20 flex items-center justify-center">
-                        <Zap size={16} className="text-cyber-red" />
+                {/* Neural Link: Distraction Shield - Always Active for offloading thoughts */}
+                <BrainDump />
+
+                {/* Secondary Components - Blurred during Dopamine Lock */}
+                <div className={cn(
+                  "space-y-8 transition-all duration-700",
+                  isActive && mode === 'focus' && "blur-md opacity-20 pointer-events-none grayscale"
+                )}>
+                  {/* Habit Tracker Section */}
+                  <HabitTracker />
+
+                  {/* Mission Briefing / Stats */}
+                  <div className="glass-card p-6 space-y-6">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
+                        <ChevronRight size={14} className="text-cyber-red" />
+                        Briefing de Missão
+                      </h3>
+                      <div className="text-[9px] font-mono text-cyber-red animate-pulse">
+                        // LINK_SEGURO_ATIVO
                       </div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Priority Slots</span>
                     </div>
-                    <span className="text-sm font-display font-bold text-white">{tasks.filter(t => t.is_priority && !t.is_completed).length} / 3</span>
+
+                    <div className="space-y-4">
+                      <div className="p-4 bg-white/5 rounded-2xl border border-white/5 relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-cyber-red opacity-50"></div>
+                        <div className="flex justify-between items-end mb-2">
+                          <p className="text-[10px] font-bold text-white/30 uppercase">Patente Operacional</p>
+                          <p className="text-xs font-bold text-cyber-red">NÍVEL {level}</p>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-cyber-red shadow-[0_0_10px_rgba(255,45,85,0.5)]" 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(xp / (level * 500)) * 100}%` }}
+                          />
+                        </div>
+                        <p className="text-[9px] text-white/20 mt-2 text-right font-mono">{xp} / {level * 500} XP PARA O PRÓXIMO NÍVEL</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/[0.08] transition-colors">
+                          <p className="text-[10px] font-bold text-white/30 uppercase mb-1">Ativas</p>
+                          <p className="text-2xl font-display font-bold text-white">{tasks.filter(t => !t.is_completed).length}</p>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/[0.08] transition-colors">
+                          <p className="text-[10px] font-bold text-white/30 uppercase mb-1">Concluídas</p>
+                          <p className="text-2xl font-display font-bold text-cyber-red">{tasks.filter(t => t.is_completed).length}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-cyber-red/5 rounded-2xl border border-cyber-red/10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyber-red/20 flex items-center justify-center">
+                          <Zap size={16} className="text-cyber-red" />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Vagas de Prioridade</span>
+                      </div>
+                      <span className="text-sm font-display font-bold text-white">{tasks.filter(t => t.is_priority && !t.is_completed).length} / 3</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -443,15 +644,71 @@ export default function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <CalendarView tasks={tasks} />
+              <CalendarView 
+                tasks={tasks} 
+                onAddTask={addTask}
+                onToggleComplete={toggleComplete}
+              />
             </motion.main>
           )}
         </AnimatePresence>
 
         <footer className="mt-auto pt-12 text-[10px] text-white/20 uppercase tracking-[0.4em] text-center">
-          Redline Productivity OS // v2.0.4 // Connection Secure
+          Redline Productivity OS // v2.3.0 // Conexão Segura
         </footer>
       </div>
+
+      {/* Focus Review Modal */}
+      <AnimatePresence>
+        {showReview && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+            <motion.div 
+               initial={{ scale: 0.9, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               className="glass-card p-10 max-w-md w-full border-cyber-red/40 bg-cyber-red/[0.02] text-center"
+            >
+              <div className="flex justify-center mb-6">
+                 <div className="w-16 h-16 rounded-full bg-cyber-red/20 flex items-center justify-center border border-cyber-red/30">
+                    <Target className="text-cyber-red" size={32} />
+                 </div>
+              </div>
+              <h2 className="text-2xl font-display font-bold text-white mb-2">Sessão Concluída</h2>
+              <p className="text-white/40 text-sm mb-8 uppercase tracking-widest font-mono">Como foi a qualidade do seu foco?</p>
+              
+              <div className="flex justify-center gap-4 mb-10">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button 
+                    key={star}
+                    onClick={() => handleReview(star)}
+                    className="group transition-all hover:scale-125"
+                  >
+                    <Zap 
+                       size={36} 
+                       className={cn(
+                          "transition-colors",
+                          star <= 3 ? "text-white/10 group-hover:text-cyber-red" : "text-white/10 group-hover:text-cyber-red"
+                        )}
+                       fill="none" 
+                       strokeWidth={1.5}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              <blockquote className="text-[10px] text-white/30 italic uppercase tracking-tighter mb-8 px-4">
+                 "A disciplina é a ponte entre as metas e as realizações."
+              </blockquote>
+
+              <button 
+                 onClick={() => setShowReview(false)}
+                 className="text-[10px] font-bold text-white/20 hover:text-white uppercase tracking-[0.2em]"
+              >
+                Ignorar Relatório
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
