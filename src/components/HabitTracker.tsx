@@ -34,14 +34,15 @@ export function HabitTracker() {
       if (error) throw error;
 
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const yesterdayDate = new Date();
+      // Use local date for better reliability in different timezones
+      const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const yesterdayDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
       const yesterday = yesterdayDate.toISOString().split('T')[0];
 
       const staleHabitIds: string[] = [];
       const formatted = (data || []).map((h: any) => {
-        let currentStreak = h.streak;
+        let currentStreak = h.streak || 0;
         const lastCompleted = h.last_completed;
 
         // Reset streak if missed days (last_completed is not today and not yesterday)
@@ -53,7 +54,8 @@ export function HabitTracker() {
         return {
           ...h,
           streak: currentStreak,
-          completed_today: lastCompleted === today
+          completed_today: lastCompleted === today,
+          last_completed: lastCompleted
         };
       });
 
@@ -91,8 +93,8 @@ export function HabitTracker() {
     if (!supabase) return;
     
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const yesterdayDate = new Date();
+    const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const yesterdayDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterday = yesterdayDate.toISOString().split('T')[0];
 
@@ -100,20 +102,16 @@ export function HabitTracker() {
     let newLastCompleted = lastCompleted;
 
     if (currentlyCompleted) {
-      // Unmarking today: decrement streak and clear last_completed
       newStreak = Math.max(0, currentStreak - 1);
-      newLastCompleted = null; // Simplification, could track previous if needed
+      newLastCompleted = null;
     } else {
-      // Marking today: 
-      // If was last completed yesterday, increment
-      // If was last completed before yesterday (or never), it's 1
-      if (lastCompleted === yesterday) {
-        newStreak = currentStreak + 1;
-      } else {
-        newStreak = 1;
-      }
+      newStreak = (lastCompleted === yesterday) ? currentStreak + 1 : 1;
       newLastCompleted = today;
     }
+
+    // Optimistic update for better UX
+    const previousHabits = [...habits];
+    setHabits(habits.map(h => h.id === id ? { ...h, streak: newStreak, completed_today: !currentlyCompleted, last_completed: newLastCompleted } : h));
 
     try {
       const { error } = await supabase
@@ -125,9 +123,10 @@ export function HabitTracker() {
         .eq('id', id);
       
       if (error) throw error;
-      setHabits(habits.map(h => h.id === id ? { ...h, streak: newStreak, completed_today: !currentlyCompleted, last_completed: newLastCompleted } : h));
     } catch (err) {
       console.error('Toggle habit error:', err);
+      // Rollback on error
+      setHabits(previousHabits);
     }
   };
 
@@ -171,23 +170,23 @@ export function HabitTracker() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={() => toggleHabit(habit.id, habit.completed_today, habit.streak, habit.last_completed)}
               className={cn(
-                "glass-card p-4 flex items-center justify-between group transition-all",
+                "glass-card p-4 flex items-center justify-between group transition-all cursor-pointer touch-manipulation",
                 habit.completed_today ? "border-cyber-red/40 bg-cyber-red/[0.03]" : "hover:bg-white/[0.02]"
               )}
             >
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => toggleHabit(habit.id, habit.completed_today, habit.streak, habit.last_completed)}
+                <div 
                   className={cn(
                     "w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all",
                     habit.completed_today 
                       ? "bg-cyber-red border-cyber-red text-white shadow-lg shadow-cyber-red/20" 
-                      : "border-white/10 hover:border-cyber-red/40 text-transparent"
+                      : "border-white/10 group-hover:border-cyber-red/40"
                   )}
                 >
-                  <Check size={20} strokeWidth={3} className={habit.completed_today ? "block" : "group-hover:text-cyber-red/40"} />
-                </button>
+                  {habit.completed_today && <Check size={20} strokeWidth={3} />}
+                </div>
                 <div>
                   <h3 className={cn("text-sm font-semibold transition-all", habit.completed_today ? "text-white" : "text-white/70")}>
                     {habit.title}
@@ -201,12 +200,18 @@ export function HabitTracker() {
                 </div>
               </div>
 
-              <button 
-                onClick={() => setHabitToDelete(habit)}
-                className="p-2 rounded-lg text-white/10 hover:text-cyber-red hover:bg-cyber-red/10 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHabitToDelete(habit);
+                  }}
+                  className="p-2 rounded-lg text-white/40 hover:text-cyber-red hover:bg-cyber-red/5 transition-all touch-manipulation"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </motion.div>
           ))}
         </AnimatePresence>
