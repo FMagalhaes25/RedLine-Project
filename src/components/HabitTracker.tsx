@@ -109,9 +109,9 @@ export function HabitTracker() {
           placeholder="Implantar novo hábito..."
           className="w-full glass-input py-3 px-5 text-sm text-white placeholder:text-white/20 outline-none"
         />
-        <button type="submit" className="absolute right-2 top-2 bottom-2 px-4 btn-primary flex items-center gap-2 text-xs">
+        <button type="submit" className="absolute right-1 sm:right-2 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 px-3 sm:px-4 btn-primary flex items-center gap-2 text-[10px] sm:text-xs">
           <Plus size={14} />
-          <span>Adicionar</span>
+          <span className="hidden sm:inline">Adicionar</span>
         </button>
       </form>
 

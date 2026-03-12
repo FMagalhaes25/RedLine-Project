@@ -59,6 +59,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [lastSessionRating, setLastSessionRating] = useState(0);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   // Focus Engine State
   const [timer, setTimer] = useState(30 * 60);
@@ -103,7 +104,7 @@ export default function App() {
     const taskData = {
       title: titleToUse,
       is_completed: false,
-      is_priority: tasks.filter(t => !t.is_completed && t.is_priority).length < 3,
+      is_priority: tasks.filter(t => !t.is_completed && t.is_priority && (t.scheduled_at ? isToday(t.scheduled_at) : isToday(t.created_at))).length < 3,
       category: dateOverride ? 'Agendado' : newCategory,
       created_at: new Date().toISOString(),
       scheduled_at: dateOverride ? dateOverride.toISOString() : new Date().toISOString(),
@@ -139,6 +140,10 @@ export default function App() {
     }
   };
 
+  const confirmDelete = (task: Task) => {
+    setTaskToDelete(task);
+  };
+
   const deleteTask = async (id: string) => {
     try {
       if (supabase) {
@@ -147,13 +152,16 @@ export default function App() {
       const updated = tasks.filter(t => t.id !== id);
       setTasks(updated);
       localStorage.setItem('redline_tasks', JSON.stringify(updated));
+      setTaskToDelete(null);
     } catch (err) {
       console.error('Delete error:', err);
     }
   };
 
   const togglePriority = async (id: string, currentPriority: boolean) => {
-    if (!currentPriority && tasks.filter(t => !t.is_completed && t.is_priority).length >= 3) {
+    if (!currentPriority && tasks.filter(t => !t.is_completed && t.is_priority && (t.scheduled_at ? isToday(t.scheduled_at) : isToday(t.created_at))).length >= 3) {
+      setError("LIMITE_ATINGIDO: O Top 3 de hoje já está completo. Conclua uma missão ou remova a prioridade.");
+      setTimeout(() => setError(null), 3000);
       return;
     }
     try {
@@ -171,14 +179,20 @@ export default function App() {
   const toggleTheOneThing = async (id: string, currentStatus: boolean) => {
     try {
       if (supabase) {
-        // Reset all others first (simplified local update)
+        // Reset all others first
         await supabase.from('tasks').update({ is_the_one_thing: false }).neq('id', id);
-        await supabase.from('tasks').update({ is_the_one_thing: !currentStatus }).eq('id', id);
+        // Set this as the one thing and ensure it's also priority
+        await supabase.from('tasks').update({ 
+          is_the_one_thing: !currentStatus,
+          is_priority: true 
+        }).eq('id', id);
       }
-      const updated = tasks.map(t => ({
-        ...t,
-        is_the_one_thing: t.id === id ? !currentStatus : false
-      }));
+      const updated = tasks.map(t => {
+        if (t.id === id) {
+          return { ...t, is_the_one_thing: !currentStatus, is_priority: true };
+        }
+        return { ...t, is_the_one_thing: false };
+      });
       setTasks(updated);
     } catch (err) {
       console.error('The One Thing error:', err);
@@ -297,10 +311,10 @@ export default function App() {
               RED<span className="text-cyber-red text-glow">LINE</span>
             </h1>
             <p className="text-[10px] text-cyber-red font-bold uppercase tracking-widest mt-1">
-              {view === 'dashboard' ? 'SO de Produtividade Moderna' : 'Arquivo de Missões & Agenda'}
+              {view === 'dashboard' ? 'Produtividade Moderna' : 'Arquivo de Missões'}
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Mobile Nav Toggle */}
             <div className="lg:hidden flex gap-2">
               <button onClick={() => setView('dashboard')} className={cn("p-2 rounded-lg", view === 'dashboard' ? "bg-cyber-red/20 text-cyber-red" : "text-white/40")}><LayoutDashboard size={20} /></button>
@@ -316,9 +330,9 @@ export default function App() {
                 />
               </div>
             </div>
-            <div className="w-12 h-12 rounded-full border-2 border-cyber-red/30 p-0.5 relative group cursor-pointer">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-cyber-red/30 p-0.5 relative group cursor-pointer">
               <img src="https://picsum.photos/seed/operator/100/100" className="rounded-full grayscale" alt="User" referrerPolicy="no-referrer" />
-              <div className="absolute -bottom-1 -right-1 bg-cyber-red text-[8px] font-black px-1.5 py-0.5 rounded-full border border-black text-white">
+              <div className="absolute -bottom-1 -right-1 bg-cyber-red text-[7px] sm:text-[8px] font-black px-1 sm:px-1.5 py-0.5 rounded-full border border-black text-white">
                 QG
               </div>
             </div>
@@ -365,8 +379,8 @@ export default function App() {
                       type="text"
                       value={newTask}
                       onChange={(e) => setNewTask(e.target.value)}
-                      placeholder="Qual a próxima missão para hoje?"
-                      className="flex-1 glass-input border-none py-4 px-6 text-white placeholder:text-white/20 outline-none"
+                      placeholder="Nova missão?"
+                      className="flex-1 glass-input border-none py-4 px-4 sm:px-6 text-sm text-white placeholder:text-white/20 outline-none min-w-0"
                     />
                   </div>
                   <button 
@@ -378,37 +392,84 @@ export default function App() {
                   </button>
                 </form>
 
-                {/* The One Thing (A Única Coisa) Section */}
-                {dashboardTasks.find(t => t.is_the_one_thing && !t.is_completed) && (
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-cyber-red flex items-center gap-2">
-                       <Zap size={14} fill="currentColor" />
-                       A Única Coisa
-                    </h3>
-                    {dashboardTasks.filter(t => t.is_the_one_thing && !t.is_completed).map(task => (
-                      <motion.div
-                        key={task.id}
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="glass-card p-6 border-cyber-red bg-cyber-red/[0.05] shadow-[0_0_20px_rgba(255,45,85,0.1)] relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 right-0 p-2 opacity-20">
-                           <Target size={40} />
-                        </div>
-                        <div className="flex items-center gap-4 relative z-10">
-                          <button 
-                            onClick={() => toggleComplete(task.id, task.is_completed)}
-                            className="w-10 h-10 rounded-xl border-2 border-cyber-red bg-cyber-red text-white flex items-center justify-center animate-pulse"
-                          >
-                            <Check size={24} strokeWidth={4} />
-                          </button>
-                          <div>
-                            <span className="text-lg font-bold text-white block mb-1">{task.title}</span>
-                            <span className="text-[10px] text-white/50 uppercase font-black">MISSÃO PRIORITÁRIA ALPHA</span>
+                {/* Top 3 Section (Inc. A Única Coisa) */}
+                {dashboardTasks.filter(t => t.is_priority && !t.is_completed).length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-cyber-red flex items-center gap-2">
+                         <Zap size={14} fill="currentColor" />
+                         Foco Top 3 de Hoje
+                      </h3>
+                      <span className="text-[10px] font-mono text-white/20">
+                        {dashboardTasks.filter(t => t.is_priority && !t.is_completed).length}/3 SLOTS
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* One Thing First */}
+                      {dashboardTasks.filter(t => t.is_the_one_thing && !t.is_completed).map(task => (
+                        <motion.div
+                          key={task.id}
+                          layout
+                          initial={{ scale: 0.95, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="glass-card p-6 border-cyber-red bg-cyber-red/[0.05] shadow-[0_0_20px_rgba(255,45,85,0.1)] relative overflow-hidden group"
+                        >
+                          <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-40 transition-opacity">
+                             <Target size={40} />
                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
+                          <div className="flex items-center gap-4 relative z-10">
+                            <button 
+                              onClick={() => toggleComplete(task.id, task.is_completed)}
+                              className="w-10 h-10 rounded-xl border-2 border-cyber-red bg-cyber-red text-white flex items-center justify-center animate-pulse"
+                            >
+                              <Check size={24} strokeWidth={4} />
+                            </button>
+                            <div className="flex-1">
+                              <span className="text-lg font-bold text-white block mb-1">{task.title}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-white/50 uppercase font-black">MISSÃO ALPHA (ÚNICA)</span>
+                                {task.category && <span className="text-[8px] bg-white/5 px-1.5 py-0.5 rounded text-white/30">{task.category}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => confirmDelete(task)} className="p-2 text-white/20 hover:text-cyber-red transition-colors"><Trash2 size={16} /></button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {/* Other Priority Tasks */}
+                      {dashboardTasks
+                        .filter(t => t.is_priority && !t.is_the_one_thing && !t.is_completed)
+                        .map(task => (
+                          <motion.div
+                            key={task.id}
+                            layout
+                            initial={{ x: -10, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            className="glass-card p-4 border-cyber-red/30 bg-cyber-red/[0.02] flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-4">
+                              <button 
+                                onClick={() => toggleComplete(task.id, task.is_completed)}
+                                className="w-8 h-8 rounded-lg border-2 border-cyber-red/50 text-cyber-red/50 hover:bg-cyber-red hover:text-white flex items-center justify-center transition-all"
+                              >
+                                {task.is_completed ? <Check size={18} /> : <Zap size={14} />}
+                              </button>
+                              <div>
+                                <span className="text-sm font-bold text-white block">{task.title}</span>
+                                <span className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Prioridade Nível 2</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => toggleTheOneThing(task.id, !!task.is_the_one_thing)} className="p-2 text-white/20 hover:text-cyber-red transition-colors" title="Elevar para Missão Alpha"><Target size={16} /></button>
+                              <button onClick={() => togglePriority(task.id, task.is_priority)} className="p-2 text-white/20 hover:text-cyber-red transition-colors"><Zap size={16} fill="currentColor" /></button>
+                              <button onClick={() => confirmDelete(task)} className="p-2 text-white/20 hover:text-cyber-red transition-colors"><Trash2 size={16} /></button>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
                   </div>
                 )}
 
@@ -425,13 +486,13 @@ export default function App() {
                     <button 
                       onClick={() => setShowOnlyPriority(!showOnlyPriority)}
                       className={cn(
-                        "text-xs font-bold px-4 py-2 rounded-full transition-all",
+                        "text-[10px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full transition-all",
                         showOnlyPriority 
                           ? "bg-cyber-red text-white shadow-lg shadow-cyber-red/20" 
                           : "bg-white/5 text-white/40 hover:bg-white/10"
                       )}
                     >
-                      {showOnlyPriority ? "Todas as Tarefas" : "Foco Top 3"}
+                      {showOnlyPriority ? "Todas" : "Foco Top 3"}
                     </button>
                   </div>
 
@@ -474,13 +535,13 @@ export default function App() {
                                 {task.title}
                               </span>
                               {task.category && (
-                                <span className="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-white/5 text-white/30 border border-white/5">
+                                <span className="hidden sm:inline-block text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-white/5 text-white/30 border border-white/5">
                                   {task.category}
                                 </span>
                               )}
                             </div>
                             
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 sm:gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => toggleTheOneThing(task.id, !!task.is_the_one_thing)}
                                 className={cn(
@@ -501,7 +562,7 @@ export default function App() {
                                 <Zap size={16} fill={task.is_priority ? "currentColor" : "none"} />
                               </button>
                               <button 
-                                onClick={() => deleteTask(task.id)}
+                                onClick={() => confirmDelete(task)}
                                 className="p-2 rounded-lg text-white/20 hover:text-cyber-red hover:bg-cyber-red/5 transition-colors"
                               >
                                 <Trash2 size={16} />
@@ -527,7 +588,7 @@ export default function App() {
                   </div>
 
                   <div className={cn(
-                    "text-8xl font-display font-bold tracking-tighter mb-8 tabular-nums transition-all duration-500",
+                    "text-6xl sm:text-8xl font-display font-bold tracking-tighter mb-8 tabular-nums transition-all duration-500",
                     isActive ? "text-cyber-red text-glow scale-105" : "text-white/90"
                   )}>
                     {formatTime(timer)}
@@ -631,7 +692,7 @@ export default function App() {
                         </div>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Vagas de Prioridade</span>
                       </div>
-                      <span className="text-sm font-display font-bold text-white">{tasks.filter(t => t.is_priority && !t.is_completed).length} / 3</span>
+                      <span className="text-sm font-display font-bold text-white">{dashboardTasks.filter(t => t.is_priority && !t.is_completed).length} / 3</span>
                     </div>
                   </div>
                 </div>
@@ -705,6 +766,43 @@ export default function App() {
               >
                 Ignorar Relatório
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {taskToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <motion.div 
+               initial={{ scale: 0.9, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               exit={{ scale: 0.9, opacity: 0 }}
+               className="glass-card p-8 max-w-sm w-full border-cyber-red/40 bg-cyber-red/[0.02] text-center"
+            >
+              <div className="w-12 h-12 rounded-xl bg-cyber-red/20 flex items-center justify-center mx-auto mb-6 border border-cyber-red/30">
+                <Trash2 className="text-cyber-red" size={24} />
+              </div>
+              <h2 className="text-xl font-display font-bold text-white mb-2">Eliminar Missão?</h2>
+              <p className="text-white/40 text-sm mb-8">
+                Esta ação enviará a missão <span className="text-white font-bold">"{taskToDelete.title}"</span> para o arquivo permanente.
+              </p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setTaskToDelete(null)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-white/5 text-white/60 font-bold text-xs uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                >
+                  Abortar
+                </button>
+                <button 
+                  onClick={() => deleteTask(taskToDelete.id)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-cyber-red text-white font-bold text-xs uppercase tracking-widest hover:shadow-lg hover:shadow-cyber-red/20 transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

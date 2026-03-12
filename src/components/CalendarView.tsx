@@ -115,18 +115,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
               key={day.toString()} 
               onClick={() => { setCurrentDate(day); setGranularity('day'); }}
               className={cn(
-                "aspect-square glass-card p-2 flex flex-col justify-between cursor-pointer transition-all",
+                "aspect-square glass-card p-1 sm:p-2 flex flex-col justify-between cursor-pointer transition-all",
                 !isCurrentMonth && "opacity-20",
                 isSameDay(day, new Date()) && "border-cyber-red bg-cyber-red/5"
               )}
             >
-              <span className="text-[10px] font-bold">{format(day, 'd')}</span>
+              <span className="text-[8px] sm:text-[10px] font-bold">{format(day, 'd')}</span>
               {dayTasks.length > 0 && (
-                <div className="flex gap-0.5 flex-wrap">
-                  {dayTasks.slice(0, 3).map(t => (
-                    <div key={t.id} className={cn("w-1 h-1 rounded-full", t.is_completed ? "bg-white/20" : "bg-cyber-red")} />
+                <div className="flex gap-0.5 flex-wrap overflow-hidden">
+                  {dayTasks.slice(0, 2).map(t => (
+                    <div key={t.id} className={cn("w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full", t.is_completed ? "bg-white/20" : "bg-cyber-red")} />
                   ))}
-                  {dayTasks.length > 3 && <div className="text-[8px] text-cyber-red">+</div>}
+                  {dayTasks.length > 2 && <div className="text-[7px] sm:text-[8px] text-cyber-red line-clamp-1">+</div>}
                 </div>
               )}
             </div>
@@ -264,7 +264,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
           <button onClick={next} className="p-2 glass-card hover:border-cyber-red/50 transition-colors"><ChevronRight size={20} /></button>
         </div>
 
-        <div className="flex p-1 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex p-1 bg-white/5 rounded-xl border border-white/10 overflow-x-auto max-w-full">
           {[
             { id: 'year', label: 'Ano' },
             { id: 'month', label: 'Mês' },
@@ -275,7 +275,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
               key={g.id}
               onClick={() => setGranularity(g.id as Granularity)}
               className={cn(
-                "px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all",
+                "px-3 sm:px-4 py-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all whitespace-nowrap",
                 granularity === g.id ? "bg-cyber-red text-white shadow-lg shadow-cyber-red/20" : "text-white/30 hover:text-white/60"
               )}
             >

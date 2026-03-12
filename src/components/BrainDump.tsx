@@ -75,7 +75,7 @@ export function BrainDump() {
         />
         <button 
           type="submit"
-          className="absolute right-2 top-2 bottom-2 px-3 text-cyber-red hover:bg-cyber-red/10 rounded-lg transition-all"
+          className="absolute right-1.5 sm:right-2 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 px-2 sm:px-3 text-cyber-red hover:bg-cyber-red/10 rounded-lg transition-all"
         >
           <Send size={16} />
         </button>
