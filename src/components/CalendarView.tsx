@@ -82,13 +82,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
         {months.map((month, idx) => {
           const monthTasks = tasks.filter(t => isSameMonth(getTaskDate(t), month));
           return (
-            <div key={month.toString()} className="glass-card p-4 hover:border-cyber-red/40 transition-colors cursor-pointer" onClick={() => { setCurrentDate(month); setGranularity('month'); }}>
+            <button 
+              type="button"
+              key={month.toString()} 
+              className="glass-card p-4 hover:border-cyber-red/40 transition-colors cursor-pointer text-left w-full touch-manipulation" 
+              onClick={() => { setCurrentDate(month); setGranularity('month'); }}
+            >
               <h3 className="text-xs font-bold uppercase tracking-widest text-cyber-red mb-2">{monthNames[idx]}</h3>
               <div className="flex justify-between items-end">
                 <span className="text-2xl font-display font-bold">{monthTasks.length}</span>
                 <span className="text-[10px] text-white/40 uppercase">Missões</span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -111,11 +116,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
           const dayTasks = tasks.filter(t => isSameDay(getTaskDate(t), day));
           const isCurrentMonth = isSameMonth(day, monthStart);
           return (
-            <div 
+            <button 
+              type="button"
               key={day.toString()} 
               onClick={() => { setCurrentDate(day); setGranularity('day'); }}
               className={cn(
-                "aspect-square glass-card p-1 sm:p-2 flex flex-col justify-between cursor-pointer transition-all",
+                "aspect-square glass-card p-1 sm:p-2 flex flex-col justify-between cursor-pointer transition-all touch-manipulation text-left",
                 !isCurrentMonth && "opacity-20",
                 isSameDay(day, new Date()) && "border-cyber-red bg-cyber-red/5"
               )}
@@ -129,7 +135,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
                   {dayTasks.length > 2 && <div className="text-[7px] sm:text-[8px] text-cyber-red line-clamp-1">+</div>}
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -151,7 +157,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
           const dayTasks = tasks.filter(t => isSameDay(getTaskDate(t), day));
           const dayNameEng = format(day, 'EEE');
           return (
-            <div key={day.toString()} className="glass-card p-4 flex gap-4 items-start">
+            <button 
+              type="button"
+              key={day.toString()} 
+              onClick={() => { setCurrentDate(day); setGranularity('day'); }}
+              className="glass-card p-4 flex gap-4 items-start w-full transition-all hover:border-cyber-red/30 touch-manipulation text-left"
+            >
               <div className="w-16 text-center">
                 <div className="text-[10px] font-bold text-white/40 uppercase">{(dayNamesShort as any)[dayNameEng]}</div>
                 <div className="text-xl font-display font-bold">{format(day, 'd')}</div>
@@ -168,7 +179,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onAddTask, on
                   ))
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
