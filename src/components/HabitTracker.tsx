@@ -17,20 +17,29 @@ interface Habit {
   completed_today: boolean;
 }
 
+import { useAuth } from '../contexts/AuthContext';
+
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [newHabit, setNewHabit] = useState('');
   const [loading, setLoading] = useState(true);
   const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchHabits();
-  }, []);
+    if (user) {
+      fetchHabits();
+    }
+  }, [user]);
 
   const fetchHabits = async () => {
-    if (!supabase) return;
+    if (!supabase || !user) return;
     try {
-      const { data, error } = await supabase.from('habits').select('*').order('created_at', { ascending: true });
+      const { data, error } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
       if (error) throw error;
 
       const now = new Date();
@@ -61,7 +70,7 @@ export function HabitTracker() {
 
       // Update stale streaks in background
       if (staleHabitIds.length > 0) {
-        supabase.from('habits').update({ streak: 0 }).in('id', staleHabitIds).then();
+        supabase.from('habits').update({ streak: 0 }).in('id', staleHabitIds).eq('user_id', user.id).then();
       }
 
       setHabits(formatted);
@@ -74,12 +83,12 @@ export function HabitTracker() {
 
   const addHabit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHabit.trim() || !supabase) return;
+    if (!newHabit.trim() || !supabase || !user) return;
 
     try {
       const { data, error } = await supabase
         .from('habits')
-        .insert([{ title: newHabit }])
+        .insert([{ title: newHabit, user_id: user.id }])
         .select();
       if (error) throw error;
       if (data) setHabits([...habits, { ...data[0], completed_today: false }]);
@@ -120,7 +129,8 @@ export function HabitTracker() {
           streak: newStreak, 
           last_completed: newLastCompleted 
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       
       if (error) throw error;
     } catch (err) {
@@ -131,9 +141,9 @@ export function HabitTracker() {
   };
 
   const deleteHabit = async (id: string) => {
-    if (!supabase) return;
+    if (!supabase || !user) return;
     try {
-      await supabase.from('habits').delete().eq('id', id);
+      await supabase.from('habits').delete().eq('id', id).eq('user_id', user.id);
       setHabits(habits.filter(h => h.id !== id));
     } catch (err) {
       console.error('Delete habit error:', err);

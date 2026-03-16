@@ -2,23 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Send, Terminal, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export function BrainDump() {
   const [content, setContent] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (showHistory) fetchHistory();
-  }, [showHistory]);
+    if (showHistory && user) fetchHistory();
+  }, [showHistory, user]);
 
   const fetchHistory = async () => {
-    if (!supabase) return;
+    if (!supabase || !user) return;
     try {
       const { data, error } = await supabase
         .from('brain_dump')
         .select('*')
+        .eq('user_id', user.id)
         .order('captured_at', { ascending: false })
         .limit(10);
       if (error) throw error;
@@ -30,12 +33,12 @@ export function BrainDump() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !supabase) return;
+    if (!content.trim() || !supabase || !user) return;
 
     try {
       const { error } = await supabase
         .from('brain_dump')
-        .insert([{ content: content.trim() }]);
+        .insert([{ content: content.trim(), user_id: user.id }]);
       
       if (error) throw error;
       setContent('');
