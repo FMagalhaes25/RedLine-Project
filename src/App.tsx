@@ -6,6 +6,7 @@ import { Layout } from './components/Layout';
 import { Modals } from './components/Modals';
 import { Dashboard } from './pages/Dashboard';
 import { CalendarApp } from './pages/CalendarApp';
+import { JiraOps } from './pages/JiraOps';
 import { Profile } from './pages/Profile';
 import { useAppLogic } from './hooks/useAppLogic';
 import { useAuth } from './contexts/AuthContext';
@@ -101,6 +102,10 @@ export default function App() {
               onAddTask={logic.addTask}
               onToggleComplete={logic.toggleComplete}
             />
+          )}
+
+          {logic.view === 'jira' && (
+            <JiraOps />
           )}
 
           {logic.view === 'profile' && (

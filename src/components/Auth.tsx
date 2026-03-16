@@ -20,6 +20,7 @@ export function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const oauthRedirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +69,7 @@ export function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: oauthRedirectUrl,
         }
       });
       if (error) throw error;

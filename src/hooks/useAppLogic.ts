@@ -13,7 +13,7 @@ export interface Task {
   scheduled_at?: string;
 }
 
-export type AppView = 'dashboard' | 'calendar' | 'profile';
+export type AppView = 'dashboard' | 'calendar' | 'jira' | 'profile';
 
 export function useAppLogic() {
   const [view, setView] = useState<AppView>('dashboard');

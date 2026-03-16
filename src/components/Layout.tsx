@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Calendar, Activity, User } from 'lucide-react';
+import { LayoutDashboard, Calendar, Activity, User, KanbanSquare, LogOut } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { AppView } from '../hooks/useAppLogic';
@@ -70,6 +70,13 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
         >
           <Calendar size={22} />
         </button>
+        <button 
+          onClick={() => setView('jira')}
+          className={cn("p-3 transition-colors", view === 'jira' ? "text-cyber-red" : "text-white/40 hover:text-cyber-red")}
+          title="Operações Jira"
+        >
+          <KanbanSquare size={22} />
+        </button>
         <div className="mt-auto flex flex-col items-center gap-4">
           <button
             onClick={() => setView('profile')}
@@ -105,15 +112,11 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
             <p className="text-[10px] text-cyber-red font-bold uppercase tracking-widest mt-1">
               {view === 'dashboard' && 'Produtividade Moderna'}
               {view === 'calendar' && 'Arquivo de Missões'}
+              {view === 'jira' && 'Operações Jira'}
               {view === 'profile' && 'Identidade do Operador'}
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Mobile Nav Toggle */}
-            <div className="lg:hidden flex gap-2">
-              <button onClick={() => setView('dashboard')} className={cn("p-2 rounded-lg", view === 'dashboard' ? "bg-cyber-red/20 text-cyber-red" : "text-white/40")}><LayoutDashboard size={20} /></button>
-              <button onClick={() => setView('calendar')} className={cn("p-2 rounded-lg", view === 'calendar' ? "bg-cyber-red/20 text-cyber-red" : "text-white/40")}><Calendar size={20} /></button>
-            </div>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs font-semibold text-white/60 text-right">
                 {displayName.toUpperCase()} <span className="text-cyber-red ml-2">[NÍVEL {level}]</span>
@@ -151,10 +154,50 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
         {/* Page Content */}
         {children}
 
-        <footer className="mt-auto pt-12 text-[10px] text-white/20 uppercase tracking-[0.4em] text-center pb-8 lg:pb-0">
+        <footer className="mt-auto pt-12 text-[10px] text-white/20 uppercase tracking-[0.4em] text-center pb-24 lg:pb-0">
           Redline Productivity OS // v2.3.0 // Conexão Segura
         </footer>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-t border-white/5 flex items-center justify-around px-1 py-2">
+        <button
+          onClick={() => setView('dashboard')}
+          className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'dashboard' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
+        >
+          <LayoutDashboard size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Base</span>
+        </button>
+        <button
+          onClick={() => setView('calendar')}
+          className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'calendar' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
+        >
+          <Calendar size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Missões</span>
+        </button>
+        <button
+          onClick={() => setView('jira')}
+          className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'jira' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
+        >
+          <KanbanSquare size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Jira</span>
+        </button>
+        <button
+          onClick={() => setView('profile')}
+          className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'profile' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
+        >
+          <User size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Perfil</span>
+        </button>
+        <button
+          onClick={signOut}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors text-white/40 hover:text-cyber-red"
+          title="Sair do sistema"
+        >
+          <LogOut size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Sair</span>
+        </button>
+      </nav>
     </div>
   );
 }
