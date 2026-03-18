@@ -13,7 +13,13 @@ export interface Task {
   scheduled_at?: string;
 }
 
-export type AppView = 'dashboard' | 'calendar' | 'jira' | 'profile';
+export interface FocusBlockedSite {
+  id: string;
+  domain: string;
+  created_at: string;
+}
+
+export type AppView = 'dashboard' | 'focus' | 'calendar' | 'jira' | 'profile' | 'privacy';
 
 export function useAppLogic() {
   const [view, setView] = useState<AppView>('dashboard');
@@ -28,13 +34,35 @@ export function useAppLogic() {
   const [showReview, setShowReview] = useState(false);
   const [lastSessionRating, setLastSessionRating] = useState(0);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [blockedSites, setBlockedSites] = useState<FocusBlockedSite[]>([]);
+  const [blocklistLoading, setBlocklistLoading] = useState(true);
   const { user, signOut } = useAuth();
 
   // Focus Engine State
-  const [timer, setTimer] = useState(30 * 60);
+  const [focusDurationMinutes, setFocusDurationMinutes] = useState(() => {
+    const local = localStorage.getItem('redline_focus_duration_minutes');
+    const parsed = Number(local);
+    if (Number.isFinite(parsed) && parsed >= 5 && parsed <= 180) {
+      return parsed;
+    }
+    return 30;
+  });
+  const [breakDurationMinutes, setBreakDurationMinutes] = useState(() => {
+    const local = localStorage.getItem('redline_break_duration_minutes');
+    const parsed = Number(local);
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 60) {
+      return parsed;
+    }
+    return 5;
+  });
+  const [timer, setTimer] = useState(focusDurationMinutes * 60);
   const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState<'focus' | 'break'>('focus');
+  const [mode, setMode] = useState<'focus' | 'break'>(() => {
+    const local = localStorage.getItem('redline_focus_mode');
+    return (local as 'focus' | 'break') || 'focus';
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const focusStartedAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -43,7 +71,47 @@ export function useAppLogic() {
       return;
     }
     fetchTasks();
+    fetchBlockedSites();
   }, [user]);
+
+  const normalizeBlockedSiteDomain = (value: string) => {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+      .split('?')[0];
+  };
+
+  const updateFocusDuration = (minutes: number) => {
+    const normalized = Math.max(1, Math.min(180, Math.floor(minutes || 30)));
+    setFocusDurationMinutes(normalized);
+    localStorage.setItem('redline_focus_duration_minutes', String(normalized));
+
+    if (!isActive && mode === 'focus') {
+      setTimer(normalized * 60);
+    }
+  };
+
+  const updateBreakDuration = (minutes: number) => {
+    const normalized = Math.max(1, Math.min(60, Math.floor(minutes || 5)));
+    setBreakDurationMinutes(normalized);
+    localStorage.setItem('redline_break_duration_minutes', String(normalized));
+
+    if (!isActive && mode === 'break') {
+      setTimer(normalized * 60);
+    }
+  };
+
+  const toggleMode = (newMode: 'focus' | 'break') => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    localStorage.setItem('redline_focus_mode', newMode);
+    if (!isActive) {
+      setTimer(newMode === 'focus' ? focusDurationMinutes * 60 : breakDurationMinutes * 60);
+    }
+  };
 
   const fetchTasks = async () => {
     if (!user) return;
@@ -62,6 +130,148 @@ export function useAppLogic() {
       if (local) setTasks(JSON.parse(local));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBlockedSites = async () => {
+    if (!user) {
+      setBlockedSites([]);
+      setBlocklistLoading(false);
+      return;
+    }
+
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('focus_blocklist')
+          .select('id, domain, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setBlockedSites(data || []);
+        localStorage.setItem('redline_focus_blocklist', JSON.stringify(data || []));
+      } else {
+        const local = localStorage.getItem('redline_focus_blocklist');
+        setBlockedSites(local ? JSON.parse(local) : []);
+      }
+    } catch (err) {
+      console.error('Blocklist fetch error:', err);
+      const local = localStorage.getItem('redline_focus_blocklist');
+      setBlockedSites(local ? JSON.parse(local) : []);
+    } finally {
+      setBlocklistLoading(false);
+    }
+  };
+
+  const addBlockedSite = async (rawDomain: string) => {
+    const domain = normalizeBlockedSiteDomain(rawDomain);
+
+    if (!domain || !domain.includes('.')) {
+      setError('SITE_INVALIDO: Informe um domínio válido, como youtube.com.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+
+    if (blockedSites.some((site) => site.domain === domain)) {
+      setError('SITE_DUPLICADO: Este domínio já está na sua blindagem de foco.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+
+    try {
+      if (supabase && user) {
+        const { data, error } = await supabase
+          .from('focus_blocklist')
+          .insert([{ user_id: user.id, domain }])
+          .select('id, domain, created_at')
+          .single();
+
+        if (error) throw error;
+
+        const updated = [...blockedSites, data];
+        setBlockedSites(updated);
+        localStorage.setItem('redline_focus_blocklist', JSON.stringify(updated));
+      } else {
+        const localSite = {
+          id: crypto.randomUUID(),
+          domain,
+          created_at: new Date().toISOString(),
+        };
+        const updated = [...blockedSites, localSite];
+        setBlockedSites(updated);
+        localStorage.setItem('redline_focus_blocklist', JSON.stringify(updated));
+      }
+      return true;
+    } catch (err) {
+      console.error('Blocklist add error:', err);
+      setError('BLOQUEIO_NAO_SALVO: Não foi possível adicionar o domínio.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+  };
+
+  const updateBlockedSite = async (id: string, rawDomain: string) => {
+    const domain = normalizeBlockedSiteDomain(rawDomain);
+
+    if (!domain || !domain.includes('.')) {
+      setError('SITE_INVALIDO: Informe um domínio válido, como youtube.com.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+
+    if (blockedSites.some((site) => site.id !== id && site.domain === domain)) {
+      setError('SITE_DUPLICADO: Este domínio já está na sua blindagem de foco.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+
+    try {
+      if (supabase && user) {
+        const { error } = await supabase
+          .from('focus_blocklist')
+          .update({ domain })
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      }
+
+      const updated = blockedSites.map((site) => (
+        site.id === id ? { ...site, domain } : site
+      ));
+      setBlockedSites(updated);
+      localStorage.setItem('redline_focus_blocklist', JSON.stringify(updated));
+      return true;
+    } catch (err) {
+      console.error('Blocklist update error:', err);
+      setError('BLOQUEIO_NAO_EDITADO: Não foi possível atualizar o domínio.');
+      setTimeout(() => setError(null), 3000);
+      return false;
+    }
+  };
+
+  const removeBlockedSite = async (id: string) => {
+    try {
+      if (supabase && user) {
+        const { error } = await supabase
+          .from('focus_blocklist')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      }
+
+      const updated = blockedSites.filter((site) => site.id !== id);
+      setBlockedSites(updated);
+      localStorage.setItem('redline_focus_blocklist', JSON.stringify(updated));
+      return true;
+    } catch (err) {
+      console.error('Blocklist delete error:', err);
+      setError('BLOQUEIO_NAO_REMOVIDO: Não foi possível remover o domínio.');
+      setTimeout(() => setError(null), 3000);
+      return false;
     }
   };
 
@@ -178,7 +388,7 @@ export function useAppLogic() {
   const handleReview = async (rating: number) => {
     try {
       if (supabase && user) {
-        await supabase.from('focus_reviews').insert([{ rating, session_duration: 30, user_id: user.id }]);
+        await supabase.from('focus_reviews').insert([{ rating, session_duration: focusDurationMinutes, user_id: user.id }]);
       }
       setLastSessionRating(rating);
       setShowReview(false);
@@ -188,12 +398,25 @@ export function useAppLogic() {
   };
 
   useEffect(() => {
+    if (!isActive && mode === 'focus') {
+      setTimer(focusDurationMinutes * 60);
+    }
+  }, [focusDurationMinutes, mode, isActive]);
+
+  useEffect(() => {
     if (isActive && timer > 0) {
       timerRef.current = setInterval(() => {
         setTimer(prev => prev - 1);
       }, 1000);
     } else if (timer === 0) {
       setIsActive(false);
+      
+      // Play Alarm
+      const alarm = new Audio('/sounds/alarm.mp3.wav');
+      const savedVolume = localStorage.getItem('redline_focus_volume');
+      alarm.volume = savedVolume ? Number(savedVolume) : 0.5;
+      alarm.play().catch(err => console.error("Erro ao tocar alarme:", err));
+
       if (mode === 'focus') {
         const xpGained = 50;
         setXp(prev => prev + xpGained);
@@ -209,6 +432,29 @@ export function useAppLogic() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isActive, timer, mode, level, xp]);
 
+  // Sync focus state to Supabase so the browser extension can read it
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const isFocusing = isActive && mode === 'focus';
+    if (isFocusing && !focusStartedAtRef.current) {
+      focusStartedAtRef.current = new Date().toISOString();
+    } else if (!isFocusing) {
+      focusStartedAtRef.current = null;
+    }
+    supabase.from('focus_state').upsert(
+      {
+        user_id: user.id,
+        is_active: isFocusing,
+        mode,
+        started_at: focusStartedAtRef.current,
+        duration_minutes: focusDurationMinutes,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    ).then(({ error }) => {
+      if (error) console.error('[RedLine] focus_state sync:', error.message);
+    });
+  }, [isActive, mode, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     view, setView,
@@ -223,11 +469,20 @@ export function useAppLogic() {
     showReview, setShowReview,
     lastSessionRating,
     taskToDelete, setTaskToDelete, confirmDelete,
+    blockedSites,
+    blocklistLoading,
     user, signOut,
     timer, setTimer,
+    focusDurationMinutes,
+    updateFocusDuration,
+    breakDurationMinutes,
+    updateBreakDuration,
     isActive, setIsActive,
-    mode, setMode,
+    mode, setMode: toggleMode,
     addTask,
+    addBlockedSite,
+    updateBlockedSite,
+    removeBlockedSite,
     toggleComplete,
     deleteTask,
     togglePriority,
