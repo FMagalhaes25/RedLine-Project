@@ -4,6 +4,6 @@
 // Do not edit manually.
 
 globalThis.REDLINE_EXTENSION_CONFIG = Object.freeze({
-  supabaseUrl: "SUPABASE_URL_PLACEHOLDER",
-  supabaseAnonKey: "SUPABASE_ANON_KEY_PLACEHOLDER",
+  supabaseUrl: "https://fcndrnhtgzdbqgfbgsls.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjbmRybmh0Z3pkYnFnZmJnc2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjM3OTksImV4cCI6MjA4ODgzOTc5OX0.wSRjsm4OByhFgcwVpVCsl5rDHJ_qWfeEY1sSQLmQtKA",
 });
