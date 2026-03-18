@@ -1,5 +1,6 @@
 import React from 'react';
-import { Play, Pause, RotateCcw, Clock, Coffee, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Play, Pause, RotateCcw, Target, Zap, Maximize2, Minimize2, ChevronLeft, ChevronRight, Coffee } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -32,6 +33,27 @@ export function FocusTimer({
   mode,
   setMode
 }: FocusTimerProps) {
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -59,7 +81,7 @@ export function FocusTimer({
         {mode === 'focus' ? (
           <Target size={14} className="text-cyber-red animate-pulse" />
         ) : (
-          <Coffee size={14} className="text-blue-400" />
+          <Zap size={14} className="text-blue-400" />
         )}
         <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/50">
           {mode === 'focus' ? 'Protocolo de Foco' : 'Recuperação Neural'}
@@ -123,13 +145,22 @@ export function FocusTimer({
           {isActive ? <><Pause size={18} /> Pausar</> : <><Play size={18} /> Iniciar Protocolo</>}
         </button>
         <button 
-          onClick={() => { 
-            setIsActive(false); 
-            setTimer(mode === 'focus' ? focusDurationMinutes * 60 : breakDurationMinutes * 60); 
+          onClick={() => {
+            setIsActive(false);
+            setTimer(mode === 'focus' ? focusDurationMinutes * 60 : breakDurationMinutes * 60);
           }}
-          className="flex-1 p-5 glass-card border-white/5 hover:border-white/10 text-white/30 hover:text-white transition-all group/reset"
+          className="p-3 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
+          title="Resetar"
         >
-          <RotateCcw size={18} className="group-hover/reset:rotate-[-180deg] transition-transform duration-500" />
+          <RotateCcw size={20} className="group-active:rotate-[-45deg] transition-transform" />
+        </button>
+
+        <button 
+          onClick={toggleFullscreen}
+          className="p-3 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"
+          title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+        >
+          {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </button>
       </div>
 
