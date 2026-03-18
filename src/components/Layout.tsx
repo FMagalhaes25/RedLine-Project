@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Calendar, Activity, User, KanbanSquare, LogOut } from 'lucide-react';
+import { LayoutDashboard, Calendar, Activity, User, KanbanSquare, LogOut, Target } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { AppView } from '../hooks/useAppLogic';
@@ -35,7 +35,7 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
       {/* Tactical Background Pulse */}
       <AnimatePresence>
         {isActive && mode === 'focus' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -44,7 +44,7 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
               background: 'radial-gradient(circle at 50% 50%, rgba(255, 45, 85, 0.03) 0%, transparent 70%)',
             }}
           >
-            <motion.div 
+            <motion.div
               className="absolute inset-0 bg-cyber-red/5"
               animate={{ opacity: [0.1, 0.3, 0.1] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -58,25 +58,34 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
         <div className="w-12 h-12 rounded-2xl bg-cyber-red flex items-center justify-center shadow-lg shadow-cyber-red/30 mb-4">
           <Activity className="text-white" size={24} />
         </div>
-        <button 
+        <button
           onClick={() => setView('dashboard')}
           className={cn("p-3 transition-colors", view === 'dashboard' ? "text-cyber-red" : "text-white/40 hover:text-cyber-red")}
+          title="Dashboard"
         >
           <LayoutDashboard size={22} />
         </button>
-        <button 
+        <button
+          onClick={() => setView('focus')}
+          className={cn("p-3 transition-colors", view === 'focus' ? "text-cyber-red" : "text-white/40 hover:text-cyber-red")}
+          title="Motor de Foco"
+        >
+          <Target size={22} />
+        </button>
+        <button
           onClick={() => setView('calendar')}
           className={cn("p-3 transition-colors", view === 'calendar' ? "text-cyber-red" : "text-white/40 hover:text-cyber-red")}
+          title="Calendário"
         >
           <Calendar size={22} />
         </button>
-        <button 
+        {/* <button 
           onClick={() => setView('jira')}
           className={cn("p-3 transition-colors", view === 'jira' ? "text-cyber-red" : "text-white/40 hover:text-cyber-red")}
           title="Operações Jira"
         >
           <KanbanSquare size={22} />
-        </button>
+        </button> */}
         <div className="mt-auto flex flex-col items-center gap-4">
           <button
             onClick={() => setView('profile')}
@@ -97,7 +106,7 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
             />
           </button>
           <button onClick={signOut} className="p-3 text-white/40 hover:text-cyber-red transition-colors" title="Sair do sistema">
-             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
           </button>
         </div>
       </nav>
@@ -111,8 +120,9 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
             </h1>
             <p className="text-[10px] text-cyber-red font-bold uppercase tracking-widest mt-1">
               {view === 'dashboard' && 'Produtividade Moderna'}
+              {view === 'focus' && 'Motor de Foco // Protocolo Alpha'}
               {view === 'calendar' && 'Arquivo de Missões'}
-              {view === 'jira' && 'Operações Jira'}
+              {/* {view === 'jira' && 'Operações Jira'} */}
               {view === 'profile' && 'Identidade do Operador'}
             </p>
           </div>
@@ -125,8 +135,8 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
                 <span className="text-[10px] text-white/25 mt-1">{operatorEmail}</span>
               )}
               <div className="w-32 h-1 bg-white/5 rounded-full mt-1 overflow-hidden border border-white/5">
-                <motion.div 
-                  className="h-full bg-cyber-red" 
+                <motion.div
+                  className="h-full bg-cyber-red"
                   initial={{ width: 0 }}
                   animate={{ width: `${(xp / (level * 500)) * 100}%` }}
                 />
@@ -169,19 +179,26 @@ export function Layout({ children, view, setView, signOut, level, xp, isActive, 
           <span className="text-[8px] uppercase tracking-widest font-bold">Base</span>
         </button>
         <button
+          onClick={() => setView('focus')}
+          className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'focus' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
+        >
+          <Target size={20} />
+          <span className="text-[8px] uppercase tracking-widest font-bold">Foco</span>
+        </button>
+        <button
           onClick={() => setView('calendar')}
           className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'calendar' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
         >
           <Calendar size={20} />
           <span className="text-[8px] uppercase tracking-widest font-bold">Missões</span>
         </button>
-        <button
+        {/* <button
           onClick={() => setView('jira')}
           className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'jira' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}
         >
           <KanbanSquare size={20} />
           <span className="text-[8px] uppercase tracking-widest font-bold">Jira</span>
-        </button>
+        </button> */}
         <button
           onClick={() => setView('profile')}
           className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors", view === 'profile' ? "text-cyber-red" : "text-white/40 hover:text-white/70")}

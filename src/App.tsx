@@ -5,10 +5,12 @@ import { Auth } from './components/Auth';
 import { Layout } from './components/Layout';
 import { Modals } from './components/Modals';
 import { Dashboard } from './pages/Dashboard';
+import { Focus } from './pages/Focus';
 import { CalendarApp } from './pages/CalendarApp';
 import { JiraOps } from './pages/JiraOps';
 import { Profile } from './pages/Profile';
-import { useAppLogic } from './hooks/useAppLogic';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { useAppLogic, AppView } from './hooks/useAppLogic';
 import { useAuth } from './contexts/AuthContext';
 import { useOperatorProfile } from './hooks/useOperatorProfile';
 
@@ -40,7 +42,10 @@ export default function App() {
   }
 
   if (!user) {
-    return <Auth />;
+    if (logic.view === 'privacy') {
+      return <PrivacyPolicy onBack={() => logic.setView('dashboard')} />;
+    }
+    return <Auth onShowPrivacy={() => logic.setView('privacy')} />;
   }
 
   return (
@@ -82,17 +87,33 @@ export default function App() {
               loading={logic.loading}
               xp={logic.xp}
               level={logic.level}
-              timer={logic.timer}
-              setTimer={logic.setTimer}
-              isActive={logic.isActive}
-              setIsActive={logic.setIsActive}
-              mode={logic.mode}
-              setMode={logic.setMode}
               toggleComplete={logic.toggleComplete}
               togglePriority={logic.togglePriority}
               toggleTheOneThing={logic.toggleTheOneThing}
               confirmDelete={logic.confirmDelete}
               isToday={logic.isToday}
+              isActive={logic.isActive}
+              mode={logic.mode}
+            />
+          )}
+
+          {logic.view === 'focus' && (
+            <Focus 
+              timer={logic.timer}
+              setTimer={logic.setTimer}
+              focusDurationMinutes={logic.focusDurationMinutes}
+              updateFocusDuration={logic.updateFocusDuration}
+              breakDurationMinutes={logic.breakDurationMinutes}
+              updateBreakDuration={logic.updateBreakDuration}
+              isActive={logic.isActive}
+              setIsActive={logic.setIsActive}
+              mode={logic.mode}
+              setMode={logic.setMode}
+              blockedSites={logic.blockedSites}
+              blocklistLoading={logic.blocklistLoading}
+              addBlockedSite={logic.addBlockedSite}
+              updateBlockedSite={logic.updateBlockedSite}
+              removeBlockedSite={logic.removeBlockedSite}
             />
           )}
 

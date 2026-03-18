@@ -12,8 +12,13 @@ function cx(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function Auth() {
+interface AuthProps {
+  onShowPrivacy: () => void;
+}
+
+export function Auth({ onShowPrivacy }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -179,12 +184,27 @@ export function Auth() {
               </div>
             </div>
 
+            {!isLogin && (
+              <div className="flex items-start gap-3 px-1">
+                <input
+                  type="checkbox"
+                  id="consent"
+                  checked={consentAccepted}
+                  onChange={(e) => setConsentAccepted(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-white/10 bg-white/5 text-cyber-red focus:ring-cyber-red focus:ring-offset-0"
+                />
+                <label htmlFor="consent" className="text-[11px] leading-relaxed text-white/40">
+                  Eu li e aceito as <button type="button" onClick={onShowPrivacy} className="text-cyber-red hover:text-white transition-colors underline decoration-cyber-red/30">Diretrizes de Privacidade</button> do protocolo RedLine.
+                </label>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && !consentAccepted)}
               className={cx(
                 "w-full py-4 rounded-xl font-bold text-sm tracking-wide transition-all relative overflow-hidden group flex items-center justify-center gap-2",
-                loading ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5" : "bg-cyber-red hover:bg-cyber-red/90 text-white shadow-[0_0_20px_rgba(255,45,85,0.3)] hover:shadow-[0_0_30px_rgba(255,45,85,0.5)] border border-cyber-red"
+                (loading || (!isLogin && !consentAccepted)) ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5" : "bg-cyber-red hover:bg-cyber-red/90 text-white shadow-[0_0_20px_rgba(255,45,85,0.3)] hover:shadow-[0_0_30px_rgba(255,45,85,0.5)] border border-cyber-red"
               )}
             >
               {loading ? (
