@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acesso Bloqueado — RedLine</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root { --red: #FF0033; }
+
+    body {
+      min-height: 100vh;
+      background: #050505;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Tactical grid */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,0,51,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,0,51,0.035) 1px, transparent 1px);
+      background-size: 52px 52px;
+      pointer-events: none;
+    }
+
+    /* Glow */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -15%; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 420px;
+      background: radial-gradient(circle, rgba(255,0,51,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative; z-index: 1;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 44px 52px;
+      max-width: 520px; width: 92%;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,0,51,0.09);
+      border: 1px solid rgba(255,0,51,0.22);
+      border-radius: 20px; padding: 5px 16px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--red); margin-bottom: 26px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; background: var(--red);
+      border-radius: 50%; animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    h1 {
+      font-size: 46px; font-weight: 900;
+      letter-spacing: -0.02em; line-height: 1.05;
+      margin-bottom: 14px;
+    }
+    h1 span { color: var(--red); }
+
+    .subtitle {
+      font-size: 13px; color: rgba(255,255,255,0.38);
+      letter-spacing: 0.04em; line-height: 1.65;
+      margin-bottom: 28px;
+    }
+
+    .blocked-site-box {
+      display: inline-block;
+      background: rgba(255,0,51,0.07);
+      border: 1px solid rgba(255,0,51,0.18);
+      border-radius: 8px; padding: 10px 20px;
+      font-size: 14px; font-weight: 700;
+      color: #FF6680; letter-spacing: 0.05em;
+      margin-bottom: 28px;
+    }
+
+    /* Timer */
+    .timer-wrap { margin-bottom: 28px; }
+    .timer-label {
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(255,255,255,0.28); margin-bottom: 8px;
+    }
+    .timer-display {
+      font-size: 42px; font-weight: 700;
+      letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,0.8);
+    }
+    .timer-display.expired { color: rgba(255,255,255,0.25); }
+
+    /* Override / confirm */
+    .override-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.28);
+      border-radius: 8px; padding: 9px 22px;
+      font-family: inherit; font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: pointer; transition: all 0.25s;
+    }
+    .override-btn:hover { border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.6); }
+
+    #confirm-panel {
+      display: none; margin-top: 14px;
+      background: rgba(255,80,0,0.07);
+      border: 1px solid rgba(255,80,0,0.2);
+      border-radius: 8px; padding: 14px 20px;
+    }
+    #confirm-panel p {
+      font-size: 12px; color: rgba(255,150,80,0.8);
+      margin-bottom: 12px; line-height: 1.55;
+    }
+    .confirm-row { display: flex; gap: 8px; justify-content: center; }
+    .btn-confirm-yes {
+      background: rgba(255,50,0,0.14);
+      border: 1px solid rgba(255,50,0,0.28);
+      color: #FF6432; border-radius: 6px;
+      padding: 7px 16px; font-family: inherit;
+      font-size: 11px; font-weight: 700;
+      cursor: pointer; letter-spacing: 0.08em;
+      text-transform: uppercase; transition: all 0.2s;
+    }
+    .btn-confirm-yes:hover { background: rgba(255,50,0,0.24); }
+    .btn-confirm-no {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      color: rgba(255,255,255,0.45);
+      border-radius: 6px; padding: 7px 16px;
+      font-family: inherit; font-size: 11px;
+      cursor: pointer; letter-spacing: 0.08em;
+      text-transform: uppercase; transition: all 0.2s;
+    }
+    .btn-confirm-no:hover { background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.8); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      RedLine Focus Guard
+    </div>
+
+    <h1>Acesso<br><span>Bloqueado</span></h1>
+
+    <p class="subtitle">
+      Este site está na sua lista de bloqueios<br>durante o modo de foco ativo.
+    </p>
+
+    <div class="blocked-site-box" id="blocked-site">—</div>
+
+    <div class="timer-wrap">
+      <div class="timer-label">Tempo restante de foco</div>
+      <div class="timer-display" id="timer-display">--:--</div>
+    </div>
+
+    <button class="override-btn" id="override-btn">Quebrar o Foco</button>
+
+    <div id="confirm-panel">
+      <p>Tem certeza? Isso vai desbloqueiar este site<br>e interromper sua sessão de concentração.</p>
+      <div class="confirm-row">
+        <button class="btn-confirm-yes" id="confirm-yes">Sim, quebrar</button>
+        <button class="btn-confirm-no"  id="confirm-no">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="blocked.js"></script>
+</body>
+</html>
