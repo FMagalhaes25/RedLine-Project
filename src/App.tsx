@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertCircle } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { Auth } from './components/Auth';
 import { Layout } from './components/Layout';
 import { Modals } from './components/Modals';
@@ -143,6 +144,7 @@ export default function App() {
         setTaskToDelete={logic.setTaskToDelete}
         deleteTask={logic.deleteTask}
       />
+      <Analytics />
     </>
   );
 }
