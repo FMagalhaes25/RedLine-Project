@@ -1,7 +1,7 @@
 'use strict';
 
-const SUPABASE_URL = globalThis.REDLINE_EXTENSION_CONFIG?.supabaseUrl || '';
-const SUPABASE_ANON_KEY = globalThis.REDLINE_EXTENSION_CONFIG?.supabaseAnonKey || '';
+const SUPABASE_URL = self.REDLINE_EXTENSION_CONFIG?.supabaseUrl || '';
+const SUPABASE_ANON_KEY = self.REDLINE_EXTENSION_CONFIG?.supabaseAnonKey || '';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 

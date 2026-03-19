@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "RedLine Focus Guard",
   "description": "Bloqueia sites distradores durante sessões de foco do RedLine.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "permissions": [
     "declarativeNetRequest",
     "storage",

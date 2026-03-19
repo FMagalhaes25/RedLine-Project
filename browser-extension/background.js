@@ -1,11 +1,10 @@
-'use strict';
-
 importScripts('config.js');
 
 const POLL_ALARM = 'redline-poll-focus';
 const POLL_INTERVAL = 0.25; // ~15 seconds
-const SUPABASE_URL = globalThis.REDLINE_EXTENSION_CONFIG?.supabaseUrl || '';
-const SUPABASE_ANON_KEY = globalThis.REDLINE_EXTENSION_CONFIG?.supabaseAnonKey || '';
+
+const SUPABASE_URL = self.REDLINE_EXTENSION_CONFIG?.supabaseUrl || '';
+const SUPABASE_ANON_KEY = self.REDLINE_EXTENSION_CONFIG?.supabaseAnonKey || '';
 
 // ─── Supabase helpers ────────────────────────────────────────────────────────
 
@@ -42,29 +41,29 @@ async function refreshAccessToken(supabaseUrl, anonKey, refreshToken) {
 }
 
 async function fetchFocusState(supabaseUrl, anonKey, accessToken, userId) {
+  const url = `${supabaseUrl}/rest/v1/focus_state?user_id=eq.${encodeURIComponent(userId)}&select=is_active,mode,started_at,duration_minutes`;
   try {
-    const res = await fetch(
-      `${supabaseUrl}/rest/v1/focus_state?user_id=eq.${encodeURIComponent(userId)}&select=is_active,mode,started_at,duration_minutes`,
-      { headers: { 'apikey': anonKey, 'Authorization': `Bearer ${accessToken}` } },
-    );
-    if (res.status === 401) return null; // token expired, caller should refresh
-    if (!res.ok) return undefined;       // other error
+    const res = await fetch(url, { headers: { 'apikey': anonKey, 'Authorization': `Bearer ${accessToken}` } });
+    if (res.status === 401) return null;
+    if (!res.ok) return undefined;
     const data = await res.json();
     return data[0] ?? { is_active: false, mode: 'focus' };
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 async function fetchBlockedSites(supabaseUrl, anonKey, accessToken, userId) {
+  const url = `${supabaseUrl}/rest/v1/focus_blocklist?user_id=eq.${encodeURIComponent(userId)}&select=domain&order=created_at.asc`;
   try {
-    const res = await fetch(
-      `${supabaseUrl}/rest/v1/focus_blocklist?user_id=eq.${encodeURIComponent(userId)}&select=domain&order=created_at.asc`,
-      { headers: { 'apikey': anonKey, 'Authorization': `Bearer ${accessToken}` } },
-    );
+    const res = await fetch(url, { headers: { 'apikey': anonKey, 'Authorization': `Bearer ${accessToken}` } });
     if (res.status === 401) return null;
     if (!res.ok) return undefined;
     const data = await res.json();
     return (data || []).map((item) => item.domain).filter(Boolean);
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 // ─── Blocking rules ──────────────────────────────────────────────────────────
