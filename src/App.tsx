@@ -51,8 +51,8 @@ export default function App() {
 
   return (
     <>
-      <Layout 
-        view={logic.view} 
+      <Layout
+        view={logic.view}
         setView={logic.setView}
         signOut={logic.signOut}
         level={logic.level}
@@ -64,7 +64,7 @@ export default function App() {
         operatorEmail={user?.email ?? null}
       >
         {logic.error && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 p-4 glass-card border-cyber-red/50 bg-cyber-red/10 text-cyber-red flex items-center gap-3 relative z-10"
@@ -76,7 +76,7 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           {logic.view === 'dashboard' && (
-            <Dashboard 
+            <Dashboard
               tasks={logic.tasks}
               newTask={logic.newTask}
               setNewTask={logic.setNewTask}
@@ -99,7 +99,7 @@ export default function App() {
           )}
 
           {logic.view === 'focus' && (
-            <Focus 
+            <Focus
               timer={logic.timer}
               setTimer={logic.setTimer}
               focusDurationMinutes={logic.focusDurationMinutes}
@@ -119,7 +119,7 @@ export default function App() {
           )}
 
           {logic.view === 'calendar' && (
-            <CalendarApp 
+            <CalendarApp
               tasks={logic.tasks}
               onAddTask={logic.addTask}
               onToggleComplete={logic.toggleComplete}
@@ -136,7 +136,7 @@ export default function App() {
         </AnimatePresence>
       </Layout>
 
-      <Modals 
+      <Modals
         showReview={logic.showReview}
         handleReview={logic.handleReview}
         setShowReview={logic.setShowReview}
@@ -144,7 +144,7 @@ export default function App() {
         setTaskToDelete={logic.setTaskToDelete}
         deleteTask={logic.deleteTask}
       />
-      <Analytics />
+      {/* <Analytics /> */}
     </>
   );
 }
